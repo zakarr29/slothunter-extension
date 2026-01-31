@@ -98,7 +98,7 @@ async function handleActivation() {
         // Generate device fingerprints
         const fingerprints = await generateFingerprints();
 
-        const response = await fetch(`${API_BASE}/api/licenses/activate`, {
+        const response = await fetch(`${API_BASE}/api/extension/activate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

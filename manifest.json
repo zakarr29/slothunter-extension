@@ -3,17 +3,8 @@
     "name": "SlotHunter",
     "description": "Automate visa slot hunting. Never miss a slot again.",
     "version": "1.0.0",
-    "icons": {
-        "16": "icons/icon16.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png"
-    },
     "action": {
-        "default_popup": "popup.html",
-        "default_icon": {
-            "16": "icons/icon16.png",
-            "48": "icons/icon48.png"
-        }
+        "default_popup": "popup.html"
     },
     "permissions": [
         "storage",
