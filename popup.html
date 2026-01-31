@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SlotHunter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎯 SlotHunter</h1>
+      <p class="tagline">Visa Slot Automation</p>
+    </div>
+
+    <!-- Status Badge -->
+    <div id="status-badge" class="status-badge inactive">
+      <span class="status-dot"></span>
+      <span class="status-text">Not Activated</span>
+    </div>
+
+    <!-- Activation Form (shown when not activated) -->
+    <div id="activation-section" class="section">
+      <div class="form-group">
+        <label for="license-key">License Key</label>
+        <input 
+          type="text" 
+          id="license-key" 
+          placeholder="SH-XXXX-XXXX-XXXX-XXXX"
+          autocomplete="off"
+        >
+      </div>
+      <button id="activate-btn" class="btn primary">
+        <span class="btn-text">Activate License</span>
+        <span class="btn-loading" style="display: none;">Activating...</span>
+      </button>
+      <p id="error-message" class="error-message"></p>
+    </div>
+
+    <!-- License Info (shown when activated) -->
+    <div id="license-section" class="section" style="display: none;">
+      <div class="license-info">
+        <div class="info-row">
+          <span class="label">License</span>
+          <span id="license-display" class="value">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Plan</span>
+          <span id="plan-display" class="value">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Expires</span>
+          <span id="expires-display" class="value">-</span>
+        </div>
+      </div>
+      
+      <!-- Monitoring Controls -->
+      <div class="controls">
+        <button id="start-monitoring" class="btn success">
+          ▶️ Start Monitoring
+        </button>
+        <button id="stop-monitoring" class="btn danger" style="display: none;">
+          ⏹️ Stop Monitoring
+        </button>
+      </div>
+
+      <button id="deactivate-btn" class="btn secondary">
+        Deactivate Device
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <a href="https://slothunter-backend.vercel.app/payment" target="_blank">Get License</a>
+      <span>•</span>
+      <a href="mailto:support@slothunter.id">Support</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
