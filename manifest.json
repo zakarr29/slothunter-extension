@@ -2,32 +2,39 @@
     "manifest_version": 3,
     "name": "SlotHunter",
     "description": "Automate visa slot hunting. Never miss a slot again.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "action": {
         "default_popup": "popup.html"
     },
     "permissions": [
         "storage",
         "alarms",
-        "notifications"
+        "notifications",
+        "activeTab"
     ],
     "host_permissions": [
         "https://slothunter-backend.vercel.app/*",
-        "https://*.vfsglobal.com/*"
+        "*://*.vfsglobal.com/*",
+        "https://www.vfsglobal.com/*",
+        "https://visa.vfsglobal.com/*"
     ],
     "background": {
-        "service_worker": "background.js",
-        "type": "module"
+        "service_worker": "background.js"
     },
     "content_scripts": [
         {
             "matches": [
-                "https://*.vfsglobal.com/*"
+                "*://*.vfsglobal.com/*",
+                "https://www.vfsglobal.com/*",
+                "https://visa.vfsglobal.com/*",
+                "*://*/vfs*",
+                "*://*/*appointment*"
             ],
             "js": [
                 "content.js"
             ],
-            "run_at": "document_idle"
+            "run_at": "document_end",
+            "all_frames": true
         }
     ]
 }

@@ -1,7 +1,12 @@
 // SlotHunter Chrome Extension - Content Script for VFS Global
 // Detects available visa appointment slots
 
-console.log('[SlotHunter] Content script loaded on:', window.location.href);
+// ========== INJECTION DEBUG ==========
+console.log('%c[SlotHunter] 🚀 CONTENT SCRIPT LOADED!', 'color: #10b981; font-size: 16px; font-weight: bold;');
+console.log('[SlotHunter] URL:', window.location.href);
+console.log('[SlotHunter] Title:', document.title);
+console.log('[SlotHunter] Hostname:', window.location.hostname);
+// =====================================
 
 // VFS slot detection configuration - UPDATED FOR ACTUAL VFS STRUCTURE
 const VFS_SELECTORS = {
