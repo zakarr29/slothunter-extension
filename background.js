@@ -252,7 +252,7 @@ function showNotification(title, message, urgent = false, url = null) {
 
     chrome.notifications.create(notificationId, {
         type: 'basic',
-        iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+        // iconUrl removed - PNG not available
         title: title,
         message: message,
         priority: urgent ? 2 : 0,
