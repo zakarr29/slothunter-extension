@@ -246,27 +246,36 @@ async function handleSlotsFound(message, sender) {
     return { success: true, acknowledged: true };
 }
 
-// Show notification
+// Show notification (with error handling)
 function showNotification(title, message, urgent = false, url = null) {
     const notificationId = `slothunter-${Date.now()}`;
 
-    chrome.notifications.create(notificationId, {
-        type: 'basic',
-        // iconUrl removed - PNG not available
-        title: title,
-        message: message,
-        priority: urgent ? 2 : 0,
-        requireInteraction: urgent
-    });
-
-    // Handle notification click
-    if (url) {
-        chrome.notifications.onClicked.addListener(function handler(clickedId) {
-            if (clickedId === notificationId) {
-                chrome.tabs.create({ url });
-                chrome.notifications.onClicked.removeListener(handler);
+    try {
+        chrome.notifications.create(notificationId, {
+            type: 'basic',
+            title: title,
+            message: message,
+            priority: urgent ? 2 : 0,
+            requireInteraction: urgent
+        }, (createdId) => {
+            if (chrome.runtime.lastError) {
+                console.log('[SlotHunter] Notification error (ignored):', chrome.runtime.lastError.message);
+            } else {
+                console.log('[SlotHunter] Notification shown:', title);
             }
         });
+
+        // Handle notification click
+        if (url) {
+            chrome.notifications.onClicked.addListener(function handler(clickedId) {
+                if (clickedId === notificationId) {
+                    chrome.tabs.create({ url });
+                    chrome.notifications.onClicked.removeListener(handler);
+                }
+            });
+        }
+    } catch (error) {
+        console.log('[SlotHunter] Notification failed (ignored):', error);
     }
 }
 

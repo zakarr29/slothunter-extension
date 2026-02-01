@@ -3,10 +3,11 @@
 
 console.log('[SlotHunter] Content script loaded on:', window.location.href);
 
-// VFS slot detection configuration
+// VFS slot detection configuration - UPDATED FOR ACTUAL VFS STRUCTURE
 const VFS_SELECTORS = {
-    // Common slot indicators (these may need adjustment based on VFS version/country)
+    // VFS slot indicators (based on actual HTML inspection)
     slotAvailable: [
+        '.info-row',  // VFS uses this for slot info
         '.appointment-slot.available',
         '.slot-available',
         '.available-slot',
@@ -18,25 +19,37 @@ const VFS_SELECTORS = {
         'button.slot-btn:not(:disabled)'
     ],
 
+    // Text patterns to search for (case insensitive)
+    slotTextPatterns: [
+        'earliest available slot',
+        'available slot',
+        'next available',
+        'appointment available',
+        'slots available'
+    ],
+
     // No slots indicators
     noSlots: [
         '.no-slots',
         '.no-appointments',
         '.fully-booked',
-        '.no-availability',
-        'p:contains("no available appointments")',
-        'span:contains("no slots available")'
+        '.no-availability'
     ],
 
-    // Page elements that indicate we're on booking page
+    // Page elements that indicate we're on VFS booking page
     bookingPage: [
+        '.info-row',  // VFS specific
+        '.license-info',  // Extension popup (for testing)
         '#appointment-table',
         '.appointment-calendar',
         '.booking-calendar',
         '.slot-selection',
         '#calendarTable',
         '.time-slots-container',
-        '#dvCalendar'
+        '#dvCalendar',
+        'form[action*="appointment"]',
+        '[class*="calendar"]',
+        '[class*="slot"]'
     ],
 
     // Date/time slot buttons
@@ -139,18 +152,41 @@ function checkForSlots() {
             }
         }
 
-        // Also try to detect by text content
-        const textIndicators = [
+        // Also check .info-row elements for slot text (VFS specific!)
+        document.querySelectorAll('.info-row, .license-info, div').forEach(el => {
+            const text = el.textContent?.toLowerCase() || '';
+
+            // Check for VFS slot patterns
+            for (const pattern of VFS_SELECTORS.slotTextPatterns) {
+                if (text.includes(pattern.toLowerCase())) {
+                    // Check if contains a date (indicates actual slot)
+                    if (/\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}/.test(el.textContent || '')) {
+                        slotCount++;
+                        foundSlots.push({
+                            text: el.textContent?.trim().slice(0, 80),
+                            type: 'info-row',
+                            pattern: pattern
+                        });
+                        console.log('[SlotHunter] Found slot via text pattern:', pattern, el.textContent?.trim().slice(0, 50));
+                        break; // Don't double-count same element
+                    }
+                }
+            }
+        });
+
+        // Also try to detect by text content in buttons
+        const buttonIndicators = [
             'available',
             'book now',
             'select appointment',
-            'choose this slot'
+            'choose this slot',
+            'continue'
         ];
 
         const allButtons = document.querySelectorAll('button, a.btn, input[type="button"]');
         allButtons.forEach(btn => {
             const text = btn.textContent?.toLowerCase() || '';
-            if (textIndicators.some(t => text.includes(t)) && !btn.disabled) {
+            if (buttonIndicators.some(t => text.includes(t)) && !btn.disabled) {
                 slotCount++;
                 foundSlots.push({
                     text: btn.textContent?.trim().slice(0, 30),
