@@ -323,4 +323,25 @@ setInterval(() => {
     chrome.runtime.getPlatformInfo(() => { });
 }, 25000);
 
+// Programmatic content script injection as fallback
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url) {
+        // Only inject on http/https pages
+        if (!tab.url.startsWith('http')) return;
+
+        try {
+            // Try to inject content script programmatically
+            await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                files: ['content.js']
+            });
+            console.log('[SlotHunter] Content script injected via programmatic injection:', tab.url);
+        } catch (error) {
+            // Ignore errors (e.g., chrome:// pages, already injected, etc.)
+            console.log('[SlotHunter] Script injection skipped:', error.message);
+        }
+    }
+});
+
 console.log('[SlotHunter] Background service worker loaded');
+
