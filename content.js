@@ -4,75 +4,43 @@
 // ========== INJECTION DEBUG ==========
 console.log('%c[SlotHunter] 🚀 CONTENT SCRIPT LOADED!', 'color: #10b981; font-size: 16px; font-weight: bold;');
 console.log('[SlotHunter] URL:', window.location.href);
-console.log('[SlotHunter] Title:', document.title);
 console.log('[SlotHunter] Hostname:', window.location.hostname);
-// =====================================
 
-// VFS slot detection configuration - UPDATED FOR ACTUAL VFS STRUCTURE
-const VFS_SELECTORS = {
-    // VFS slot indicators (based on actual HTML inspection)
-    slotAvailable: [
-        '.info-row',  // VFS uses this for slot info
-        '.appointment-slot.available',
-        '.slot-available',
-        '.available-slot',
-        '.calendar-day.available',
-        'td.available',
-        '[data-available="true"]',
-        '.slot:not(.disabled):not(.unavailable)',
-        '.timeslot:not(.disabled)',
-        'button.slot-btn:not(:disabled)'
-    ],
+// ========== VFS HOSTNAME CHECK ==========
+const isVFSPage = window.location.hostname.includes('vfsglobal.com') ||
+    window.location.hostname.includes('vfs') ||
+    window.location.href.includes('visa') ||
+    window.location.href.includes('appointment');
 
-    // Text patterns to search for (case insensitive)
-    slotTextPatterns: [
-        'earliest available slot',
-        'available slot',
-        'next available',
-        'appointment available',
-        'slots available'
-    ],
+if (!isVFSPage) {
+    console.log('[SlotHunter] ⚠️ Not a VFS/visa page, skipping slot detection');
+    // Don't run slot detection on non-VFS pages
+} else {
+    console.log('[SlotHunter] ✅ VFS/visa page detected, initializing slot detection...');
+}
 
-    // No slots indicators
-    noSlots: [
-        '.no-slots',
-        '.no-appointments',
-        '.fully-booked',
-        '.no-availability'
-    ],
-
-    // Page elements that indicate we're on VFS booking page
-    bookingPage: [
-        '.info-row',  // VFS specific
-        '.license-info',  // Extension popup (for testing)
-        '#appointment-table',
-        '.appointment-calendar',
-        '.booking-calendar',
-        '.slot-selection',
-        '#calendarTable',
-        '.time-slots-container',
-        '#dvCalendar',
-        'form[action*="appointment"]',
-        '[class*="calendar"]',
-        '[class*="slot"]'
-    ],
-
-    // Date/time slot buttons
-    dateSlots: [
-        '.calendar-day:not(.disabled)',
-        'td.calendar-cell:not(.disabled)',
-        '.date-slot',
-        '.available-date'
-    ]
-};
+// Slot text patterns to search for (regex patterns)
+const SLOT_PATTERNS = [
+    /earliest\s+available\s+slot.*?(\d{2}[-\/]\d{2}[-\/]\d{4})/i,
+    /available\s+slot\s+(?:is|for).*?(\d{2}[-\/]\d{2}[-\/]\d{4})/i,
+    /next\s+available.*?(\d{2}[-\/]\d{2}[-\/]\d{4})/i,
+    /appointment\s+available.*?(\d{2}[-\/]\d{2}[-\/]\d{4})/i,
+    /(\d{2}[-\/]\d{2}[-\/]\d{4}).*?(?:available|slot)/i
+];
 
 // State tracking
 let lastSlotCount = 0;
 let isChecking = false;
 let observer = null;
+let hasAlerted = false;
 
-// Initialize
+// Initialize only on VFS pages
 (async () => {
+    if (!isVFSPage) {
+        console.log('[SlotHunter] Skipping - not a VFS page');
+        return;
+    }
+
     const { license, accessToken } = await chrome.storage.local.get(['license', 'accessToken']);
 
     if (!license || !accessToken) {
@@ -80,7 +48,7 @@ let observer = null;
         return;
     }
 
-    console.log('[SlotHunter] Licensed - initializing slot detection');
+    console.log('[SlotHunter] Licensed + VFS page - starting slot detection!');
     initSlotDetection();
 })();
 
@@ -118,115 +86,79 @@ function checkForSlots() {
     if (isChecking) return;
     isChecking = true;
 
+    console.log('[SlotHunter] Checking for available slots via text patterns...');
+
     try {
-        // First check if we're on a booking page
-        const isBookingPage = VFS_SELECTORS.bookingPage.some(selector => {
-            try {
-                return document.querySelector(selector) !== null;
-            } catch {
-                return false;
-            }
-        });
+        // Get full page text content
+        const pageText = document.body.innerText || document.body.textContent || '';
 
-        if (!isBookingPage) {
-            console.log('[SlotHunter] Not on booking page');
-            isChecking = false;
-            return;
-        }
-
-        console.log('[SlotHunter] On booking page, checking slots...');
-
-        // Count available slots
         let slotCount = 0;
         const foundSlots = [];
 
-        for (const selector of VFS_SELECTORS.slotAvailable) {
-            try {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    slotCount += elements.length;
-                    elements.forEach(el => {
-                        foundSlots.push({
-                            text: el.textContent?.trim().slice(0, 50),
-                            selector: selector
-                        });
-                    });
-                }
-            } catch (e) {
-                // Invalid selector, skip
+        // Check each pattern against page text
+        for (const pattern of SLOT_PATTERNS) {
+            const match = pageText.match(pattern);
+            if (match) {
+                slotCount++;
+                const slotInfo = {
+                    fullMatch: match[0].slice(0, 100),
+                    date: match[1],
+                    pattern: pattern.toString().slice(0, 50)
+                };
+                foundSlots.push(slotInfo);
+                console.log('%c[SlotHunter] 🎯 SLOT DATE FOUND!', 'color: #f59e0b; font-size: 14px; font-weight: bold;', slotInfo);
             }
         }
 
-        // Also check .info-row elements for slot text (VFS specific!)
-        document.querySelectorAll('.info-row, .license-info, div').forEach(el => {
-            const text = el.textContent?.toLowerCase() || '';
+        // Also try direct date search with context
+        const datePattern = /(\d{2}[-\/]\d{2}[-\/]\d{4})/g;
+        const allDates = pageText.match(datePattern);
+        if (allDates && allDates.length > 0) {
+            console.log('[SlotHunter] Dates found on page:', allDates);
 
-            // Check for VFS slot patterns
-            for (const pattern of VFS_SELECTORS.slotTextPatterns) {
-                if (text.includes(pattern.toLowerCase())) {
-                    // Check if contains a date (indicates actual slot)
-                    if (/\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}/.test(el.textContent || '')) {
+            // Check if any date is near "available" or "slot" text
+            allDates.forEach(date => {
+                const dateIndex = pageText.indexOf(date);
+                const context = pageText.slice(Math.max(0, dateIndex - 100), dateIndex + 50).toLowerCase();
+
+                if (context.includes('available') || context.includes('slot') || context.includes('earliest')) {
+                    if (!foundSlots.find(s => s.date === date)) {
                         slotCount++;
                         foundSlots.push({
-                            text: el.textContent?.trim().slice(0, 80),
-                            type: 'info-row',
-                            pattern: pattern
+                            date: date,
+                            context: context.slice(0, 80),
+                            type: 'date-context'
                         });
-                        console.log('[SlotHunter] Found slot via text pattern:', pattern, el.textContent?.trim().slice(0, 50));
-                        break; // Don't double-count same element
+                        console.log('[SlotHunter] 🎯 Date with slot context:', date, context.slice(0, 50));
                     }
                 }
-            }
-        });
-
-        // Also try to detect by text content in buttons
-        const buttonIndicators = [
-            'available',
-            'book now',
-            'select appointment',
-            'choose this slot',
-            'continue'
-        ];
-
-        const allButtons = document.querySelectorAll('button, a.btn, input[type="button"]');
-        allButtons.forEach(btn => {
-            const text = btn.textContent?.toLowerCase() || '';
-            if (buttonIndicators.some(t => text.includes(t)) && !btn.disabled) {
-                slotCount++;
-                foundSlots.push({
-                    text: btn.textContent?.trim().slice(0, 30),
-                    type: 'button'
-                });
-            }
-        });
-
-        // Highlight found slots
-        if (slotCount > 0) {
-            highlightSlots();
+            });
         }
 
-        // If slots found and count changed, notify background
-        if (slotCount > 0 && slotCount !== lastSlotCount) {
-            console.log('[SlotHunter] 🎉 SLOTS FOUND:', slotCount);
+        // If slots found and not already alerted
+        if (slotCount > 0 && !hasAlerted) {
+            console.log('%c[SlotHunter] 🎉🎉🎉 SLOTS AVAILABLE! 🎉🎉🎉', 'color: #10b981; font-size: 20px; font-weight: bold;');
+
+            hasAlerted = true;
 
             // Play sound alert
             playAlertSound();
 
             // Show visual indicator
-            showSlotIndicator(slotCount);
+            showSlotIndicator(slotCount, foundSlots[0]?.date);
 
             // Notify background script
             chrome.runtime.sendMessage({
                 type: 'SLOTS_FOUND',
                 count: slotCount,
                 url: window.location.href,
-                slots: foundSlots.slice(0, 5), // First 5 slots info
+                slots: foundSlots.slice(0, 5),
                 timestamp: new Date().toISOString()
             });
 
             lastSlotCount = slotCount;
         } else if (slotCount === 0) {
-            console.log('[SlotHunter] No slots available');
+            console.log('[SlotHunter] No slots found in page text');
             hideSlotIndicator();
         }
 
@@ -280,19 +212,13 @@ function highlightSlots() {
       100% { transform: scale(1); }
     }
   `;
-
-    // Highlight slot elements
-    for (const selector of VFS_SELECTORS.slotAvailable) {
-        try {
-            document.querySelectorAll(selector).forEach(el => {
-                el.classList.add('slothunter-highlight');
-            });
-        } catch { }
-    }
 }
 
 // Show floating indicator
-function showSlotIndicator(count) {
+function showSlotIndicator(count, date) {
+    // Inject styles first
+    highlightSlots();
+
     let indicator = document.getElementById('slothunter-indicator');
 
     if (!indicator) {
@@ -302,7 +228,8 @@ function showSlotIndicator(count) {
         document.body.appendChild(indicator);
     }
 
-    indicator.innerHTML = `🎯 ${count} SLOT${count > 1 ? 'S' : ''} AVAILABLE!`;
+    const dateText = date ? ` - ${date}` : '';
+    indicator.innerHTML = `🎯 ${count} SLOT${count > 1 ? 'S' : ''} FOUND!${dateText}`;
     indicator.style.display = 'block';
 }
 
