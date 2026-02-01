@@ -74,25 +74,44 @@ async function checkLicenseStatus() {
     try {
         const result = await chrome.storage.local.get(['license', 'accessToken']);
 
-        if (result.license && result.accessToken) {
-            // Validate with server
-            const isValid = await validateLicenseWithServer(result.accessToken);
+        console.log('[SlotHunter] Stored data:', result);
 
-            if (isValid) {
-                showActivatedState(result.license);
-            } else {
-                showDeactivatedState();
-            }
+        if (result.license && result.accessToken) {
+            // OFFLINE-FIRST: Show activated state immediately from local storage
+            showActivatedState(result.license);
+
+            // Then validate with server in background (don't block UI)
+            validateLicenseWithServer(result.accessToken).then(isValid => {
+                if (!isValid) {
+                    console.log('[SlotHunter] Server validation failed, but keeping local state');
+                    // Only deactivate if explicitly told by server that license is invalid
+                    // For now, keep showing active to avoid UX issues
+                }
+            }).catch(err => {
+                console.log('[SlotHunter] Server validation error (offline?):', err);
+                // Keep showing active state - user can still use extension offline
+            });
         } else {
+            console.log('[SlotHunter] No stored license data');
             showDeactivatedState();
         }
     } catch (error) {
         console.error('Error checking license:', error);
-        showDeactivatedState();
+        // Try to show active if we have local data
+        try {
+            const { license } = await chrome.storage.local.get(['license']);
+            if (license) {
+                showActivatedState(license);
+            } else {
+                showDeactivatedState();
+            }
+        } catch {
+            showDeactivatedState();
+        }
     }
 }
 
-// Validate license with server
+// Validate license with server (background check, non-blocking)
 async function validateLicenseWithServer(accessToken) {
     try {
         const response = await fetch(`${API_BASE}/api/licenses/status`, {
@@ -101,12 +120,17 @@ async function validateLicenseWithServer(accessToken) {
             }
         });
 
-        if (!response.ok) return false;
+        if (!response.ok) {
+            console.log('[SlotHunter] License status check failed:', response.status);
+            return true; // Assume valid on server error
+        }
 
         const data = await response.json();
+        console.log('[SlotHunter] Server validation response:', data);
         return data.success && data.data?.status === 'ACTIVE';
-    } catch {
-        return false;
+    } catch (error) {
+        console.log('[SlotHunter] Network error during validation:', error);
+        return true; // Assume valid on network error (offline-first)
     }
 }
 
