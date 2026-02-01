@@ -33,6 +33,40 @@ function setupEventListeners() {
     licenseKeyInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleActivation();
     });
+
+    // Monitoring controls
+    const startBtn = document.getElementById('start-monitoring');
+    const stopBtn = document.getElementById('stop-monitoring');
+
+    if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting...';
+
+            const response = await chrome.runtime.sendMessage({
+                type: 'START_MONITORING',
+                config: { checkIntervalMinutes: 5 }
+            });
+
+            if (response?.success) {
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+                updateMonitoringStats();
+            }
+            startBtn.disabled = false;
+            startBtn.textContent = '▶️ Start Monitoring';
+        });
+    }
+
+    if (stopBtn) {
+        stopBtn.addEventListener('click', async () => {
+            stopBtn.disabled = true;
+            await chrome.runtime.sendMessage({ type: 'STOP_MONITORING' });
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'block';
+            stopBtn.disabled = false;
+        });
+    }
 }
 
 // Check license status from storage
@@ -258,3 +292,46 @@ function showError(message) {
 function clearError() {
     errorMessage.textContent = '';
 }
+
+// Update monitoring stats display
+async function updateMonitoringStats() {
+    try {
+        const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+        if (response?.success) {
+            const stats = response.data;
+            console.log('[SlotHunter] Monitoring stats:', stats);
+
+            // Update button visibility based on monitoring state
+            const startBtn = document.getElementById('start-monitoring');
+            const stopBtn = document.getElementById('stop-monitoring');
+
+            if (stats.isMonitoring) {
+                if (startBtn) startBtn.style.display = 'none';
+                if (stopBtn) stopBtn.style.display = 'block';
+            } else {
+                if (startBtn) startBtn.style.display = 'block';
+                if (stopBtn) stopBtn.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('[SlotHunter] Error getting stats:', error);
+    }
+}
+
+// Check monitoring status on load
+async function initMonitoringState() {
+    const { isMonitoring } = await chrome.storage.local.get(['isMonitoring']);
+    const startBtn = document.getElementById('start-monitoring');
+    const stopBtn = document.getElementById('stop-monitoring');
+
+    if (isMonitoring) {
+        if (startBtn) startBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'block';
+    }
+}
+
+// Call on load
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initMonitoringState, 100);
+});
+
